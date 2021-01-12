@@ -1,0 +1,92 @@
+#!/bin/sh
+# dwall - a dmenu frontend for the hsetroot wallpaper setter
+# written by Cassandra J. Carter
+
+wallpaper_dir=${HOME}/Pictures/wallpapers
+cache_dir=${HOME}/.cache
+cache_path=${cache_dir}/dwallpaper
+chosen_file=""
+chosen_path=""
+chosen_render_option=""
+
+function print_help() {
+	echo -e "dwall - a dmenu frontend to the hsetroot wallpaper setter"
+	echo -e ""
+	echo -e "Syntax: dwallpaper [COMMAND]"
+	echo -e "Commands"
+	echo -e "  none\t Open the wallpaper selection menu"
+	echo -e " -r --restore\t Restore a previously set wallpaper"
+	echo -e " -h --help\t Display this help message and exit"
+}
+
+function choose_wallpaper() {
+	wallpapers=($(ls -1a $wallpaper_dir))
+	unset wallpapers[0]
+	unset wallpapers[1]
+
+	chosen_file=$(printf "%s\n" "${wallpapers[@]}" | dmenu)
+	if [ -z $chosen_file ]; then
+		exit 1
+	fi
+	chosen_path=${wallpaper_dir}/${chosen_file}
+
+	chosen_render_option="$(echo -e "center\ncover\ntile\nfull\nextend\nfill" | dmenu)"
+	if [ -z $chosen_render_option ]; then
+		exit 1
+	fi
+	write_cache_file
+	set_wallpaper
+
+}
+
+function write_cache_file() {
+	echo -n "" > $cache_path
+	echo $chosen_path >> $cache_path
+	echo $chosen_render_option >> $cache_path
+}
+
+function set_wallpaper() {
+	eval "hsetroot -${chosen_render_option} ${chosen_path}"
+}
+
+function restore() {
+	if [ ! -f $cache_path ]; then
+		echo "A wallpaper has not been previously set. Run 'dwallpaper' to set a wallpaper"
+		exit 1
+	fi
+
+	IFS=$'\n' read -d '' -r -a lines < $cache_path
+	chosen_path="${lines[0]}"
+	chosen_render_option="${lines[1]}"
+	set_wallpaper
+	exit 0
+}
+
+if ! type dmenu > /dev/null; then
+	echo "dmenu is not installed"
+	exit 1
+fi
+
+if ! type hsetroot > /dev/null; then
+	echo "hsetroot is not installed"
+	exit 1
+fi
+
+if [ $# -gt "2" ]; then
+	echo "Invalid number of arguments ($#)"
+	echo "---"
+	print_help
+	exit 1
+fi
+
+case $1 in
+	-h | --help)
+		print_help
+		;;
+	-r | --restore)
+		restore
+		;;
+esac
+
+choose_wallpaper
+
