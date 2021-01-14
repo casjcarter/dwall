@@ -1,8 +1,7 @@
 # dwall :framed_picture:
 A dmenu front-end for the hsetroot wallpaper setter. 
 
-dwall searches for image files in `~/Pictures/wallpapers`. Isolating supported
-image formats, the ability to add multiple wallpaper directories, and the 
+dwall searches for image files in `~/Pictures/wallpapers`. The ability to add multiple wallpaper directories and the 
 ability to search recursively through wallpaper directories is planned for 
 future versions.
 
