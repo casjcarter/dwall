@@ -12,7 +12,7 @@ chosen_render_option=""
 function print_help() {
 	echo -e "dwall - a dmenu frontend to the hsetroot wallpaper setter"
 	echo -e ""
-	echo -e "Syntax: dwallpaper [COMMAND]"
+	echo -e "Syntax: dwall [COMMAND]"
 	echo -e "Commands"
 	echo -e "  none\t Open the wallpaper selection menu"
 	echo -e " -r --restore\t Restore a previously set wallpaper"
@@ -20,9 +20,20 @@ function print_help() {
 }
 
 function choose_wallpaper() {
-	wallpapers=($(ls -1a $wallpaper_dir))
-	unset wallpapers[0]
-	unset wallpapers[1]
+	# Filters out files that are not image files
+	files=($(ls -1a $wallpaper_dir))
+	wallpapers=()
+
+	for (( i=0; i < ${#files[@]}; i++ )); do
+		extension=$(echo "${files[i]}" | cut -d . -f 2)
+		case ${extension} in
+			png | jpg | jpeg)
+				wallpapers+=(${files[i]})
+				;;
+			*)
+				;;
+		esac
+	done
 
 	chosen_file=$(printf "%s\n" "${wallpapers[@]}" | dmenu)
 	if [ -z $chosen_file ]; then
@@ -34,12 +45,11 @@ function choose_wallpaper() {
 	if [ -z $chosen_render_option ]; then
 		exit 1
 	fi
-	write_cache_file
+	write_cmd_cache_file
 	set_wallpaper
-
 }
 
-function write_cache_file() {
+function write_cmd_cache_file() {
 	echo -n "" > $cache_path
 	echo $chosen_path >> $cache_path
 	echo $chosen_render_option >> $cache_path
@@ -51,7 +61,7 @@ function set_wallpaper() {
 
 function restore() {
 	if [ ! -f $cache_path ]; then
-		echo "A wallpaper has not been previously set. Run 'dwallpaper' to set a wallpaper"
+		echo "A wallpaper has not been previously set. Run 'dwall' to set a wallpaper"
 		exit 1
 	fi
 
