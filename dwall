@@ -1,5 +1,5 @@
 #!/bin/sh
-# dwall - a dmenu frontend for the hsetroot wallpaper setter
+# dwall - a dmenu frontend for the xwallpaper wallpaper setter
 # written by Cassandra J. Carter
 
 wallpaper_dir=""
@@ -10,7 +10,7 @@ chosen_file_path=""
 chosen_render_option=""
 
 function print_help() {
-	echo -e "dwall - a dmenu frontend to the hsetroot wallpaper setter"
+	echo -e "dwall - a dmenu frontend to the xwallpaper wallpaper setter"
 	echo -e ""
 	echo -e "Syntax: dwall [COMMAND]"
 	echo -e "Commands"
@@ -30,7 +30,7 @@ function choose_wallpaper() {
 
 	chosen_file_path=${wallpaper_dir}/${chosen_file_name}
 
-	chosen_render_option="$(echo -e "center\ncover\ntile\nfull\nextend\nfill" | dmenu)"
+	chosen_render_option="$(echo -e "center\nfocus\nmaximize\nstretch\ntile\nzoom" | dmenu)"
 
 	if [ -z $chosen_render_option ]; then exit 1; fi
 
@@ -45,7 +45,7 @@ function write_cmd_data_file() {
 }
 
 function set_wallpaper() {
-	eval "hsetroot -${chosen_render_option} ${chosen_file_path}"
+	eval "xwallpaper --${chosen_render_option} ${chosen_file_path}"
 }
 
 function read_cmd_data_file() {
@@ -66,8 +66,8 @@ if ! type dmenu > /dev/null; then
 	exit 1
 fi
 
-if ! type hsetroot > /dev/null; then
-	echo "hsetroot is not installed"
+if ! type xwallpaper > /dev/null; then
+	echo "xwallpaper is not installed"
 	exit 1
 fi
 
