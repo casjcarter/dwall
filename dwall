@@ -2,11 +2,11 @@
 # dwall - a dmenu frontend for the hsetroot wallpaper setter
 # written by Cassandra J. Carter
 
-wallpaper_dir=${HOME}/Pictures/wallpapers
-cache_dir=${HOME}/.cache
-cache_path=${cache_dir}/dwallpaper
-chosen_file=""
-chosen_path=""
+wallpaper_dir=""
+data_dir=${HOME}/.cache
+cmd_data_path=${data_dir}/dwallcmd
+chosen_file_name=""
+chosen_file_path=""
 chosen_render_option=""
 
 function print_help() {
@@ -14,59 +14,48 @@ function print_help() {
 	echo -e ""
 	echo -e "Syntax: dwall [COMMAND]"
 	echo -e "Commands"
-	echo -e "  none\t Open the wallpaper selection menu"
+	echo -e "  none\t\t Open the wallpaper selection menu in the working directory"
+	echo -e "  path/to/dir \t Open the wallpaper selection menu in the given directory"
 	echo -e " -r --restore\t Restore a previously set wallpaper"
 	echo -e " -h --help\t Display this help message and exit"
 }
 
 function choose_wallpaper() {
 	# Filters out files that are not image files
-	files=($(ls -1a $wallpaper_dir))
-	wallpapers=()
+	wallpapers=($(ls -1a $wallpaper_dir | grep -e ".png" -e ".jpg" -e ".jpeg"))
 
-	for (( i=0; i < ${#files[@]}; i++ )); do
-		extension=$(echo "${files[i]}" | cut -d . -f 2)
-		case ${extension} in
-			png | jpg | jpeg)
-				wallpapers+=(${files[i]})
-				;;
-			*)
-				;;
-		esac
-	done
+	chosen_file_name=$(printf "%s\n" "${wallpapers[@]}" | dmenu)
 
-	chosen_file=$(printf "%s\n" "${wallpapers[@]}" | dmenu)
-	if [ -z $chosen_file ]; then
-		exit 1
-	fi
-	chosen_path=${wallpaper_dir}/${chosen_file}
+	if [ -z $chosen_file_name ]; then exit 1; fi
+
+	chosen_file_path=${wallpaper_dir}/${chosen_file_name}
 
 	chosen_render_option="$(echo -e "center\ncover\ntile\nfull\nextend\nfill" | dmenu)"
-	if [ -z $chosen_render_option ]; then
-		exit 1
-	fi
-	write_cmd_cache_file
+
+	if [ -z $chosen_render_option ]; then exit 1; fi
+
+	write_cmd_data_file
 	set_wallpaper
 }
 
-function write_cmd_cache_file() {
-	echo -n "" > $cache_path
-	echo $chosen_path >> $cache_path
-	echo $chosen_render_option >> $cache_path
+function write_cmd_data_file() {
+	echo -n "" > $cmd_data_path
+	echo $chosen_file_path >> $cmd_data_path
+	echo $chosen_render_option >> $cmd_data_path
 }
 
 function set_wallpaper() {
-	eval "hsetroot -${chosen_render_option} ${chosen_path}"
+	eval "hsetroot -${chosen_render_option} ${chosen_file_path}"
 }
 
-function restore() {
-	if [ ! -f $cache_path ]; then
+function read_cmd_data_file() {
+	if [ ! -f $cmd_data_path ]; then
 		echo "A wallpaper has not been previously set. Run 'dwall' to set a wallpaper"
 		exit 1
 	fi
 
-	IFS=$'\n' read -d '' -r -a lines < $cache_path
-	chosen_path="${lines[0]}"
+	IFS=$'\n' read -d '' -r -a lines < $cmd_data_path
+	chosen_file_path="${lines[0]}"
 	chosen_render_option="${lines[1]}"
 	set_wallpaper
 	exit 0
@@ -94,9 +83,17 @@ case $1 in
 		print_help
 		;;
 	-r | --restore)
-		restore
+		read_cmd_data_file
 		;;
+	*)
+		if [ -z $1 ]; then
+			wallpaper_dir="$PWD"
+			choose_wallpaper
+		elif [ ! -d $1 ]; then
+			echo "Invalid directory selected!"
+			exit 1
+	else
+			wallpaper_dir="$1"
+			choose_wallpaper
+		fi
 esac
-
-choose_wallpaper
-
