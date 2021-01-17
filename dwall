@@ -2,67 +2,14 @@
 # dwall - a dmenu frontend for the xwallpaper wallpaper setter
 # written by Cassandra J. Carter
 
-wallpaper_dir=""
-data_dir=${HOME}/.cache
-cmd_data_path=${data_dir}/dwallcmd
-chosen_file_name=""
-chosen_file_path=""
-chosen_render_option=""
-
-function print_help() {
-	echo -e "dwall - a dmenu frontend to the xwallpaper wallpaper setter"
-	echo -e ""
-	echo -e "Syntax: dwall [COMMAND]"
-	echo -e "Commands"
-	echo -e "  none\t\t Open the wallpaper selection menu in the working directory"
-	echo -e "  path/to/dir \t Open the wallpaper selection menu in the given directory"
-	echo -e " -r --restore\t Restore a previously set wallpaper"
-	echo -e " -h --help\t Display this help message and exit"
-}
-
-function choose_wallpaper() {
-	# Filters out files that are not image files
-	wallpapers=($(ls -1a $wallpaper_dir | grep -e ".png" -e ".jpg" -e ".jpeg"))
-
-	chosen_file_name=$(printf "%s\n" "${wallpapers[@]}" | dmenu)
-
-	if [ -z $chosen_file_name ]; then exit 1; fi
-
-	chosen_file_path=${wallpaper_dir}/${chosen_file_name}
-
-	chosen_render_option="$(echo -e "center\nfocus\nmaximize\nstretch\ntile\nzoom" | dmenu)"
-
-	if [ -z $chosen_render_option ]; then exit 1; fi
-
-	write_cmd_data_file
-	set_wallpaper
-}
-
-function write_cmd_data_file() {
-	echo -n "" > $cmd_data_path
-	echo $chosen_file_path >> $cmd_data_path
-	echo $chosen_render_option >> $cmd_data_path
-}
-
-function set_wallpaper() {
-	eval "xwallpaper --${chosen_render_option} ${chosen_file_path}"
-}
-
-function read_cmd_data_file() {
-	if [ ! -f $cmd_data_path ]; then
-		echo "A wallpaper has not been previously set. Run 'dwall' to set a wallpaper"
-		exit 1
-	fi
-
-	IFS=$'\n' read -d '' -r -a lines < $cmd_data_path
-	chosen_file_path="${lines[0]}"
-	chosen_render_option="${lines[1]}"
-	set_wallpaper
-	exit 0
-}
 
 if ! type dmenu > /dev/null; then
 	echo "dmenu is not installed"
+	exit 1
+fi
+
+if ! type xrandr > /dev/null; then
+	echo "xrandr is not installed"
 	exit 1
 fi
 
@@ -78,12 +25,93 @@ if [ $# -gt "2" ]; then
 	exit 1
 fi
 
+wallpaper_dir=""
+data_dir=${HOME}/.cache/dwall
+chosen_file_name=""
+chosen_file_path=""
+chosen_render_option=""
+chosen_monitor=""
+monitors=($(xrandr | grep -w "connected" | cut -d ' ' -f 1))
+
+function print_help() {
+	echo -e "dwall - a dmenu frontend to the xwallpaper wallpaper setter"
+	echo -e ""
+	echo -e "Syntax: dwall [COMMAND]"
+	echo -e "Commands"
+	echo -e "  none\t\t Open the wallpaper selection menu in the working directory"
+	echo -e "  path/to/dir \t Open the wallpaper selection menu in the given directory"
+	echo -e " -r --restore\t Restore a previously set wallpaper"
+	echo -e " -h --help\t Display this help message and exit"
+}
+
+# Pipe wallpapers from a directory into dmenu
+function choose_wallpaper() {
+	# Filters out files that are not image files
+	wallpapers=($(ls -1a $wallpaper_dir | grep -e ".png" -e ".jpg" -e ".jpeg"))
+
+	chosen_file_name=$(printf "%s\n" "${wallpapers[@]}" | dmenu)
+
+	if [ -z $chosen_file_name ]; then exit 1; fi
+
+	chosen_file_path=${wallpaper_dir}/${chosen_file_name}
+
+	chosen_render_option="$(echo -e "center\nfocus\nmaximize\nstretch\ntile\nzoom" | dmenu)"
+	if [ -z $chosen_render_option ]; then exit 1; fi
+
+	chosen_monitor=$(printf "%s\n" "${monitors[@]}" | dmenu)
+	if [ -z $chosen_monitor ]; then exit 1; fi
+
+	write_cmd_data_file
+	set_wallpaper
+}
+
+# Writes the selected wallpaper and render option to file
+function write_cmd_data_file() {
+	if [ ! -d $data_dir ]; then mkdir -p $data_dir; fi
+	if [ $chosen_monitor == "All monitors" ]; then
+		for monitor in ${monitors[@]}; do
+			file=$data_dir/dwall-$monitor
+			echo "Writing to $file"
+			echo -n "" > $file
+			echo $chosen_file_path >> $file
+			echo $chosen_render_option >> $file
+		done
+	else
+		file=$data_dir/dwall-$chosen_monitor
+		echo "Writing to $file"
+		echo -n "" > $file
+		echo $chosen_file_path >> $file
+		echo $chosen_render_option >> $file
+	fi
+}
+
+# Reads the selected wallpaper and render option from file
+function set_wallpaper() {
+	cmd="xwallpaper"
+
+	for monitor in ${monitors[@]}; do
+		file=$data_dir/dwall-$monitor
+		echo "Reading from $file"
+		if [ ! -f $file ]; then
+			echo "A wallpaper has not been previously set for $monitor. Run 'dwall' to set a wallpaper"
+			continue
+		fi
+		IFS=$'\n' read -d '' -r -a lines < $file
+		chosen_file_path="${lines[0]}"
+		chosen_render_option="${lines[1]}"
+		cmd="${cmd} --output ${monitor} --${chosen_render_option} ${chosen_file_path}"
+	done
+	eval $cmd 2> /dev/null
+	exit 0
+}
+
+# Parse arguments
 case $1 in
 	-h | --help)
 		print_help
 		;;
 	-r | --restore)
-		read_cmd_data_file
+		set_wallpaper
 		;;
 	*)
 		if [ -z $1 ]; then
